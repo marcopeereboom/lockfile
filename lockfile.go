@@ -70,6 +70,7 @@ func (l *LockFile) Lock(timeout time.Duration) error {
 	for {
 		l.mtx.Lock()
 		if l.descriptor != nil {
+			l.mtx.Unlock()
 			return ErrLocked
 		}
 		l.descriptor, err = os.OpenFile(l.filename,
