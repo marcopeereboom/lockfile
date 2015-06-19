@@ -3,6 +3,7 @@ package lockfile
 import (
 	"io/ioutil"
 	"os"
+	"sync"
 	"testing"
 	"time"
 )
@@ -37,8 +38,11 @@ func TestRace(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	var wg sync.WaitGroup
 	for i := 0; i < 100; i++ {
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			err = l1.Lock(time.Second)
 			if err != nil {
 				t.Fatalf("l1 %v: %v", lockfile, err)
@@ -50,7 +54,9 @@ func TestRace(t *testing.T) {
 			}
 		}()
 
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			err = l2.Lock(time.Second)
 			if err != nil {
 				t.Fatalf("l2 %v: %v", lockfile, err)
@@ -61,6 +67,7 @@ func TestRace(t *testing.T) {
 				t.Fatal(err)
 			}
 		}()
+		wg.Wait()
 	}
 }
 
