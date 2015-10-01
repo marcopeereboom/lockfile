@@ -47,6 +47,7 @@ func New(filename string) (*LockFile, error) {
 	if err != nil {
 		return nil, err
 	}
+	fd.Close()
 	err = os.Remove(fd.Name())
 	if err != nil {
 		return nil, err
@@ -95,8 +96,6 @@ func (l *LockFile) Lock(timeout time.Duration) error {
 // Unlock attempts to unlock by removing the lock file.  The caller must check
 // the error.
 func (l *LockFile) Unlock() error {
-	var err error
-
 	l.mtx.Lock()
 	defer l.mtx.Unlock()
 
@@ -108,10 +107,5 @@ func (l *LockFile) Unlock() error {
 		l.descriptor = nil
 	}()
 
-	err = os.Remove(l.filename)
-	if err != nil {
-		return err
-	}
-
-	return l.descriptor.Close()
+	return l.remove()
 }

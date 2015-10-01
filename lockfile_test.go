@@ -18,14 +18,13 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+	fd.Close()
 
 	lockfile = fd.Name()
 	err = os.Remove(fd.Name())
 	if err != nil {
 		panic(err)
 	}
-
-	fd.Close()
 }
 
 func TestRace(t *testing.T) {
