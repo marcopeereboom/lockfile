@@ -68,15 +68,16 @@ func (l *LockFile) Lock(timeout time.Duration) error {
 	var err error
 
 	end := time.Now().Add(timeout)
+
+	l.mtx.Lock()
+	defer l.mtx.Unlock()
+
 	for {
-		l.mtx.Lock()
 		if l.descriptor != nil {
-			l.mtx.Unlock()
 			return ErrLocked
 		}
 		l.descriptor, err = os.OpenFile(l.filename,
 			os.O_CREATE|os.O_EXCL, 0600)
-		l.mtx.Unlock()
 
 		if os.IsExist(err) {
 			if time.Now().Before(end) {

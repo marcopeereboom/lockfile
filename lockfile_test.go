@@ -189,6 +189,80 @@ func TestLockUnlockAfter(t *testing.T) {
 	}
 }
 
+func TestLockExclusion(t *testing.T) {
+	l1, err := New(lockfile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err = l1.Lock(time.Second)
+		if err != nil {
+			t.Fatalf("first lock %v: %v", lockfile, err)
+		}
+		time.Sleep(time.Second)
+		err = l1.Unlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+	wg.Wait()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err = l1.Lock(2 * time.Second)
+		if err != nil {
+			t.Fatalf("second lock %v: %v", lockfile, err)
+		}
+		time.Sleep(time.Second)
+		err = l1.Unlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+	wg.Wait()
+}
+
+func TestLockExclusionTimeout(t *testing.T) {
+	l1, err := New(lockfile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		// wait longer time than following go routine
+		time.Sleep(time.Second)
+		err = l1.Lock(time.Second)
+		if err == nil {
+			t.Fatalf("first lock should have timed out")
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		// wait shorter time than prior go routine
+		time.Sleep(250 * time.Millisecond)
+		err = l1.Lock(2 * time.Second)
+		if err != nil {
+			t.Fatalf("second lock %v: %v", lockfile, err)
+		}
+		time.Sleep(time.Second)
+		err = l1.Unlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+	wg.Wait()
+}
+
 func TestLockTimeout(t *testing.T) {
 	l1, err := New(lockfile)
 	if err != nil {
