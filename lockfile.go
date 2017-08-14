@@ -10,45 +10,33 @@ package lockfile
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
-	"path"
-	"sync"
 	"time"
 )
 
 var (
-	ErrTimeout   = errors.New("timeout")
-	ErrNotLocked = errors.New("not locked")
-	ErrLocked    = errors.New("locked")
-)
-
-const (
-	resolution = 100 * time.Millisecond
+	ErrTimeout = errors.New("timeout")
 )
 
 // LockFile opaque type that contains the lockfile context.
 type LockFile struct {
-	mtx        sync.Mutex
-	filename   string
+	dirname    string
 	resolution time.Duration
-	descriptor *os.File
 }
 
 // New returns a LockFile context if the directory is writable.
-func New(filename string) (*LockFile, error) {
+func New(dirname string, resolution time.Duration) (*LockFile, error) {
 	l := LockFile{
-		filename:   filename,
+		dirname:    dirname,
 		resolution: resolution,
 	}
 
-	// make sure we can write to directory
-	fd, err := ioutil.TempFile(path.Dir(filename), "testlock")
+	err := os.Mkdir(dirname, 0600)
 	if err != nil {
 		return nil, err
 	}
-	fd.Close()
-	err = os.Remove(fd.Name())
+
+	err = os.Remove(dirname)
 	if err != nil {
 		return nil, err
 	}
@@ -61,34 +49,28 @@ func (l *LockFile) Resolution(resolution time.Duration) {
 	l.resolution = resolution
 }
 
+func (l *LockFile) TryLock() bool {
+	err := os.Mkdir(l.dirname, 0600)
+	if err == nil {
+		return true
+	}
+	return false
+}
+
 // Lock attempts to create a lock file within the given timeout.  If the lock
 // can not be obtained within the given timeout or due to a filesystem error it
 // returns failure.  The caller must check the error.
 func (l *LockFile) Lock(timeout time.Duration) error {
-	var err error
-
 	end := time.Now().Add(timeout)
-
-	l.mtx.Lock()
-	defer l.mtx.Unlock()
-
 	for {
-		if l.descriptor != nil {
-			return ErrLocked
+		if l.TryLock() {
+			return nil
 		}
-		l.descriptor, err = os.OpenFile(l.filename,
-			os.O_CREATE|os.O_EXCL, 0600)
-
-		if os.IsExist(err) {
-			if time.Now().Before(end) {
-				time.Sleep(resolution)
-				continue
-			}
-			return ErrTimeout
-		} else if err != nil {
-			return err
+		if time.Now().Before(end) {
+			time.Sleep(l.resolution)
+			continue
 		}
-		return nil
+		return ErrTimeout
 	}
 
 	return fmt.Errorf("not reached")
@@ -97,16 +79,5 @@ func (l *LockFile) Lock(timeout time.Duration) error {
 // Unlock attempts to unlock by removing the lock file.  The caller must check
 // the error.
 func (l *LockFile) Unlock() error {
-	l.mtx.Lock()
-	defer l.mtx.Unlock()
-
-	if l.descriptor == nil {
-		return ErrNotLocked
-	}
-
-	defer func() {
-		l.descriptor = nil
-	}()
-
-	return l.remove()
+	return os.Remove(l.dirname)
 }

@@ -28,11 +28,11 @@ func init() {
 }
 
 func TestRace(t *testing.T) {
-	l1, err := New(lockfile)
+	l1, err := New(lockfile, 100*time.Millisecond)
 	if err != nil {
 		t.Fatal(err)
 	}
-	l2, err := New(lockfile)
+	l2, err := New(lockfile, 100*time.Millisecond)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +42,7 @@ func TestRace(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			err = l1.Lock(time.Second)
+			err := l1.Lock(time.Second)
 			if err != nil {
 				t.Fatalf("l1 %v: %v", lockfile, err)
 			}
@@ -56,7 +56,7 @@ func TestRace(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			err = l2.Lock(time.Second)
+			err := l2.Lock(time.Second)
 			if err != nil {
 				t.Fatalf("l2 %v: %v", lockfile, err)
 			}
@@ -70,12 +70,59 @@ func TestRace(t *testing.T) {
 	}
 }
 
+func TestRaceVariable(t *testing.T) {
+	l1, e1 := New(lockfile, 100*time.Millisecond)
+	if e1 != nil {
+		t.Fatal(e1)
+	}
+	l2, e2 := New(lockfile, 100*time.Millisecond)
+	if e2 != nil {
+		t.Fatal(e2)
+	}
+
+	var wg sync.WaitGroup
+	x := 0
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err := l1.Lock(5 * time.Second)
+			if err != nil {
+				t.Fatalf("l1 %v: %v", lockfile, err)
+			}
+			x++
+			err = l1.Unlock()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}()
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err := l2.Lock(5 * time.Second)
+			if err != nil {
+				t.Fatalf("l2 %v: %v", lockfile, err)
+			}
+			x--
+			err = l2.Unlock()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}()
+	}
+	wg.Wait()
+	if x != 0 {
+		t.Fatalf("invalid x %v", x)
+	}
+}
+
 func TestLockUnlockRace(t *testing.T) {
-	l1, err := New(lockfile)
+	l1, err := New(lockfile, 100*time.Millisecond)
 	if err != nil {
 		t.Fatal(err)
 	}
-	l2, err := New(lockfile)
+	l2, err := New(lockfile, 100*time.Millisecond)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,11 +159,11 @@ func TestLockUnlockRace(t *testing.T) {
 }
 
 func TestLockUnlockBefore(t *testing.T) {
-	l1, err := New(lockfile)
+	l1, err := New(lockfile, 100*time.Millisecond)
 	if err != nil {
 		t.Fatal(err)
 	}
-	l2, err := New(lockfile)
+	l2, err := New(lockfile, 100*time.Millisecond)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,11 +198,11 @@ func TestLockUnlockBefore(t *testing.T) {
 }
 
 func TestLockUnlockAfter(t *testing.T) {
-	l1, err := New(lockfile)
+	l1, err := New(lockfile, 100*time.Millisecond)
 	if err != nil {
 		t.Fatal(err)
 	}
-	l2, err := New(lockfile)
+	l2, err := New(lockfile, 100*time.Millisecond)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +237,7 @@ func TestLockUnlockAfter(t *testing.T) {
 }
 
 func TestLockExclusion(t *testing.T) {
-	l1, err := New(lockfile)
+	l1, err := New(lockfile, 100*time.Millisecond)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,7 +275,7 @@ func TestLockExclusion(t *testing.T) {
 }
 
 func TestLockExclusionTimeout(t *testing.T) {
-	l1, err := New(lockfile)
+	l1, err := New(lockfile, 100*time.Millisecond)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,9 +284,8 @@ func TestLockExclusionTimeout(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		// wait longer time than following go routine
-		time.Sleep(time.Second)
-		err = l1.Lock(time.Second)
+		time.Sleep(500 * time.Millisecond)
+		err := l1.Lock(time.Second)
 		if err == nil {
 			t.Fatalf("first lock should have timed out")
 		}
@@ -248,13 +294,11 @@ func TestLockExclusionTimeout(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		// wait shorter time than prior go routine
-		time.Sleep(250 * time.Millisecond)
-		err = l1.Lock(2 * time.Second)
+		err := l1.Lock(1 * time.Second)
 		if err != nil {
 			t.Fatalf("second lock %v: %v", lockfile, err)
 		}
-		time.Sleep(time.Second)
+		time.Sleep(2 * time.Second)
 		err = l1.Unlock()
 		if err != nil {
 			t.Fatal(err)
@@ -264,11 +308,11 @@ func TestLockExclusionTimeout(t *testing.T) {
 }
 
 func TestLockTimeout(t *testing.T) {
-	l1, err := New(lockfile)
+	l1, err := New(lockfile, 100*time.Millisecond)
 	if err != nil {
 		t.Fatal(err)
 	}
-	l2, err := New(lockfile)
+	l2, err := New(lockfile, 100*time.Millisecond)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -290,13 +334,18 @@ func TestLockTimeout(t *testing.T) {
 }
 
 func TestLockAlreadyLocked(t *testing.T) {
-	l1, err := New(lockfile)
+	l1, err := New(lockfile, 100*time.Millisecond)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// fake out lock
-	l1.descriptor = &os.File{}
+	err = l1.Lock(time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l1.Unlock() // clean up after ourselves
+
+	// lock against self
 	err = l1.Lock(time.Second)
 	if err == nil {
 		t.Fatal("lock should have failed")
@@ -304,7 +353,7 @@ func TestLockAlreadyLocked(t *testing.T) {
 }
 
 func TestUnlockAlreadyUnlocked(t *testing.T) {
-	l1, err := New(lockfile)
+	l1, err := New(lockfile, 100*time.Millisecond)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -314,18 +363,13 @@ func TestUnlockAlreadyUnlocked(t *testing.T) {
 		t.Fatalf("l1 %v: %v", lockfile, err)
 	}
 
-	// fake unlock out
-	fd := l1.descriptor
-	l1.descriptor = nil
+	err = l1.Unlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	err = l1.Unlock()
 	if err == nil {
 		t.Fatalf("unlock should have failed")
-	}
-
-	l1.descriptor = fd
-	err = l1.Unlock()
-	if err != nil {
-		t.Fatal(err)
 	}
 }
