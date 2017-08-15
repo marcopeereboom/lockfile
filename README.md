@@ -6,7 +6,7 @@ Additionally it uses an internal mutex to provide single process serialization.
 Typical usage:
 ```Go
 	// Create lock
-	l, err := New(lockfile)
+	l, err := New(lockfile, 100*time.Millisecond)
 	if err != nil {
 		return err
 	}
@@ -14,7 +14,7 @@ Typical usage:
 	...
 
 	// Lock something
-	err = l.Lock(5* time.Second)
+	err = l.Lock(5*time.Second)
 	if err != nil {
 		return err
 	}
