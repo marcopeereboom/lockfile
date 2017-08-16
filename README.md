@@ -1,7 +1,7 @@
 # lockfile - package that manages filesystem locks.
 
 The lockfile package uses the filesystem to serialize cooperative processes.
-Additionally it uses an internal mutex to provide single process serialization.
+Additionally it provides single process serialization.
 
 Typical usage:
 ```Go
